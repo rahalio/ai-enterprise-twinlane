@@ -1,0 +1,720 @@
+openapi: 3.0.3
+info:
+  title: Twinlane
+  version: 0.1.0
+  description: >-
+    Dual-lane analytics platform control plane separating strict-deadline production
+    workloads from ad-hoc discovery, with stream ingest, promotion gates, serving sinks,
+    and lineage patterned on hyperscale reference architectures.
+  x-product-slug: ai-enterprise-twinlane
+  x-source: ai-in-enterprise/Big Data Analytics Reference Architectures - Big Data on Facebook, LinkedIn and Twitter/
+servers:
+  - url: https://api.example.com
+tags:
+  - name: Lanes
+    description: Production vs ad-hoc lane isolation
+  - name: Sources
+    description: Snapshots, log aggregators, and stream topics
+  - name: Workloads
+    description: Scheduled and ad-hoc workloads with deadline classes
+  - name: Promotions
+    description: Dev/ad-hoc to production promotion gates
+  - name: Sinks
+    description: Serving sinks and real-time paths
+  - name: Lineage
+    description: Source-to-sink lineage graph
+  - name: Governance
+    description: Break-glass, access policy, and cost showback
+paths:
+  /v1/lanes:
+    get:
+      operationId: listLanes
+      tags: [Lanes]
+      security: [{ BearerAuth: [] }]
+      responses:
+        "200":
+          description: Lanes
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ListEnvelopeLane" }
+    post:
+      operationId: createLane
+      tags: [Lanes]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/Lane" }
+      responses:
+        "201":
+          description: Lane created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DataEnvelopeLane" }
+  /v1/lanes/{laneId}/capacity-policy:
+    parameters:
+      - name: laneId
+        in: path
+        required: true
+        schema: { type: string }
+    put:
+      operationId: putLaneCapacityPolicy
+      tags: [Lanes]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [guaranteedSharePercent, preemptible]
+              properties:
+                guaranteedSharePercent: { type: number, format: float }
+                preemptible: { type: boolean }
+      responses:
+        "200":
+          description: Capacity policy updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DataEnvelopeLane" }
+  /v1/data-sources:
+    get:
+      operationId: listDataSources
+      tags: [Sources]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Data sources
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ListEnvelopeDataSource" }
+    post:
+      operationId: registerDataSource
+      tags: [Sources]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DataSource" }
+      responses:
+        "201":
+          description: Source registered
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DataEnvelopeDataSource" }
+  /v1/stream-topics:
+    get:
+      operationId: listStreamTopics
+      tags: [Sources]
+      security: [{ ApiKeyAuth: [] }, { BearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Stream topics
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ListEnvelopeStreamTopic" }
+    post:
+      operationId: registerStreamTopic
+      tags: [Sources]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StreamTopic" }
+      responses:
+        "201":
+          description: Topic registered
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DataEnvelopeStreamTopic" }
+  /v1/workloads:
+    get:
+      operationId: listWorkloads
+      tags: [Workloads]
+      security: [{ ApiKeyAuth: [] }, { BearerAuth: [] }]
+      parameters:
+        - name: lane
+          in: query
+          schema: { type: string, enum: [production, ad_hoc] }
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Workloads page
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ListEnvelopeWorkload" }
+    post:
+      operationId: submitWorkload
+      tags: [Workloads]
+      security: [{ ApiKeyAuth: [] }, { BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/Workload" }
+      responses:
+        "201":
+          description: Workload submitted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DataEnvelopeWorkload" }
+        "403":
+          description: Ad-hoc credentials cannot submit to production
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Problem" }
+  /v1/workloads/{workloadId}/schedule:
+    parameters:
+      - name: workloadId
+        in: path
+        required: true
+        schema: { type: string }
+    put:
+      operationId: putWorkloadSchedule
+      tags: [Workloads]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SchedulePolicy" }
+      responses:
+        "200":
+          description: Schedule updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DataEnvelopeSchedulePolicy" }
+  /v1/promotions:
+    get:
+      operationId: listPromotions
+      tags: [Promotions]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Promotion requests
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ListEnvelopePromotionRequest" }
+    post:
+      operationId: createPromotionRequest
+      tags: [Promotions]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PromotionRequest" }
+      responses:
+        "201":
+          description: Promotion requested
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DataEnvelopePromotionRequest" }
+  /v1/promotions/{promotionId}/decision:
+    parameters:
+      - name: promotionId
+        in: path
+        required: true
+        schema: { type: string }
+    post:
+      operationId: decidePromotion
+      tags: [Promotions]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [outcome, rationale]
+              properties:
+                outcome: { type: string, enum: [approve, reject] }
+                rationale: { type: string }
+      responses:
+        "200":
+          description: Promotion decided
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DataEnvelopePromotionRequest" }
+  /v1/serving-sinks:
+    get:
+      operationId: listServingSinks
+      tags: [Sinks]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Serving sinks
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ListEnvelopeServingSink" }
+    post:
+      operationId: registerServingSink
+      tags: [Sinks]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ServingSink" }
+      responses:
+        "201":
+          description: Sink registered
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DataEnvelopeServingSink" }
+  /v1/realtime-paths:
+    post:
+      operationId: registerRealtimePath
+      tags: [Sinks]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RealtimePath" }
+      responses:
+        "201":
+          description: Real-time path registered
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DataEnvelopeRealtimePath" }
+  /v1/lineage:
+    get:
+      operationId: queryLineage
+      tags: [Lineage]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: entityId
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Lineage edges
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ListEnvelopeLineageEdge" }
+  /v1/governance/break-glass:
+    post:
+      operationId: openBreakGlass
+      tags: [Governance]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BreakGlassWaiver" }
+      responses:
+        "201":
+          description: Break-glass opened
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DataEnvelopeBreakGlassWaiver" }
+  /v1/governance/cost-allocations:
+    get:
+      operationId: listCostAllocations
+      tags: [Governance]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: period
+          in: query
+          schema: { type: string }
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Cost showback
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ListEnvelopeCostAllocation" }
+components:
+
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    Cursor:
+      name: cursor
+      in: query
+      schema: { type: string }
+    Limit:
+      name: limit
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+  responses:
+    Unauthorized:
+      description: Missing or invalid credentials
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    UnprocessableEntity:
+      description: Validation failed
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Problem" }
+
+  schemas:
+
+    ResponseMeta:
+      type: object
+      required: [requestId, timestamp]
+      properties:
+        requestId: { type: string }
+        timestamp: { type: string, format: date-time }
+    Problem:
+      type: object
+      required: [type, title, status]
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+
+    Lane:
+      type: object
+      required: [id, name, type]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        type: { type: string, enum: [production, ad_hoc] }
+        guaranteedSharePercent: { type: number, format: float }
+        preemptible: { type: boolean }
+    DataSource:
+      type: object
+      required: [id, name, sourceKind, classification]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        sourceKind: { type: string, enum: [oltp_snapshot, event_log, stream_activity, firehose] }
+        classification: { type: string, enum: [public, internal, restricted, highly_sensitive] }
+        systemRef: { type: string, example: "federated MySQL / Scribe / Kafka" }
+    StreamTopic:
+      type: object
+      required: [id, name, owner, lagSloMs]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        owner: { type: string }
+        lagSloMs: { type: integer }
+        retentionHours: { type: integer }
+    Workload:
+      type: object
+      required: [id, name, lane, owner, engine]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        lane: { type: string, enum: [production, ad_hoc] }
+        owner: { type: string }
+        engine: { type: string, enum: [mapreduce, hive, spark, pig, shell, other] }
+        deadlineClass: { type: string, enum: [strict, standard, best_effort] }
+        status: { type: string, enum: [queued, running, succeeded, failed, preempted] }
+    SchedulePolicy:
+      type: object
+      required: [workloadId, cron, deadlineClass]
+      properties:
+        workloadId: { type: string }
+        cron: { type: string }
+        deadlineClass: { type: string, enum: [strict, standard, best_effort] }
+        alertBeforeBreachMinutes: { type: integer }
+    PromotionRequest:
+      type: object
+      required: [id, workloadId, fromLane, status]
+      properties:
+        id: { type: string }
+        workloadId: { type: string }
+        fromLane: { type: string, enum: [ad_hoc, development] }
+        status: { type: string, enum: [requested, approved, rejected] }
+        testEvidenceUri: { type: string, format: uri }
+        rationale: { type: string }
+    ServingSink:
+      type: object
+      required: [id, name, sinkType, owner, freshnessSlaMinutes]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        sinkType: { type: string, enum: [online_db, olap_cube, frontend_cache, stream_feedback, bi_semantic] }
+        owner: { type: string }
+        freshnessSlaMinutes: { type: integer }
+    RealtimePath:
+      type: object
+      required: [id, name, latencyBudgetMs]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        latencyBudgetMs: { type: integer }
+        description: { type: string, example: "EarlyBird-class retrieval path" }
+    LineageEdge:
+      type: object
+      required: [id, fromEntityId, toEntityId, edgeType]
+      properties:
+        id: { type: string }
+        fromEntityId: { type: string }
+        toEntityId: { type: string }
+        edgeType: { type: string, enum: [ingests, transforms, publishes, replicates] }
+    BreakGlassWaiver:
+      type: object
+      required: [id, workloadId, reason, expiresAt]
+      properties:
+        id: { type: string }
+        workloadId: { type: string }
+        reason: { type: string }
+        expiresAt: { type: string, format: date-time }
+        retrospectiveRequired: { type: boolean, default: true }
+    CostAllocation:
+      type: object
+      required: [id, lane, owner, period, amount]
+      properties:
+        id: { type: string }
+        lane: { type: string }
+        owner: { type: string }
+        period: { type: string }
+        amount: { type: number, format: double }
+        currency: { type: string, example: USD }
+
+    DataEnvelopeLane:
+      type: object
+      required: [data, meta]
+      properties:
+        data: { $ref: "#/components/schemas/Lane" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    ListEnvelopeLane:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/Lane" }
+            nextCursor: { type: string }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    DataEnvelopeDataSource:
+      type: object
+      required: [data, meta]
+      properties:
+        data: { $ref: "#/components/schemas/DataSource" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    ListEnvelopeDataSource:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/DataSource" }
+            nextCursor: { type: string }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    DataEnvelopeStreamTopic:
+      type: object
+      required: [data, meta]
+      properties:
+        data: { $ref: "#/components/schemas/StreamTopic" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    ListEnvelopeStreamTopic:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/StreamTopic" }
+            nextCursor: { type: string }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    DataEnvelopeWorkload:
+      type: object
+      required: [data, meta]
+      properties:
+        data: { $ref: "#/components/schemas/Workload" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    ListEnvelopeWorkload:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/Workload" }
+            nextCursor: { type: string }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    DataEnvelopeSchedulePolicy:
+      type: object
+      required: [data, meta]
+      properties:
+        data: { $ref: "#/components/schemas/SchedulePolicy" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    ListEnvelopeSchedulePolicy:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/SchedulePolicy" }
+            nextCursor: { type: string }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    DataEnvelopePromotionRequest:
+      type: object
+      required: [data, meta]
+      properties:
+        data: { $ref: "#/components/schemas/PromotionRequest" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    ListEnvelopePromotionRequest:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/PromotionRequest" }
+            nextCursor: { type: string }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    DataEnvelopeServingSink:
+      type: object
+      required: [data, meta]
+      properties:
+        data: { $ref: "#/components/schemas/ServingSink" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    ListEnvelopeServingSink:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/ServingSink" }
+            nextCursor: { type: string }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    DataEnvelopeRealtimePath:
+      type: object
+      required: [data, meta]
+      properties:
+        data: { $ref: "#/components/schemas/RealtimePath" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    ListEnvelopeRealtimePath:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/RealtimePath" }
+            nextCursor: { type: string }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    DataEnvelopeLineageEdge:
+      type: object
+      required: [data, meta]
+      properties:
+        data: { $ref: "#/components/schemas/LineageEdge" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    ListEnvelopeLineageEdge:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/LineageEdge" }
+            nextCursor: { type: string }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    DataEnvelopeBreakGlassWaiver:
+      type: object
+      required: [data, meta]
+      properties:
+        data: { $ref: "#/components/schemas/BreakGlassWaiver" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    ListEnvelopeBreakGlassWaiver:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/BreakGlassWaiver" }
+            nextCursor: { type: string }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    DataEnvelopeCostAllocation:
+      type: object
+      required: [data, meta]
+      properties:
+        data: { $ref: "#/components/schemas/CostAllocation" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    ListEnvelopeCostAllocation:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/CostAllocation" }
+            nextCursor: { type: string }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
